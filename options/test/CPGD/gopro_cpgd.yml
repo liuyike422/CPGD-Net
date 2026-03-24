@@ -1,0 +1,145 @@
+# ------------------------------------------------------------------------
+# Copyright (c) 2021 megvii-model. All Rights Reserved.
+# ------------------------------------------------------------------------
+# Modified from BasicSR (https://github.com/xinntao/BasicSR)
+# Copyright 2018-2020 BasicSR Authors
+# ------------------------------------------------------------------------
+# general settings
+name: gopro_test
+model_type: ModelCPGD
+manual_seed: 0
+num_gpu: auto
+reload: true
+retrain: False
+flowrefine_ratio: 0.25
+offset_ratio: 0.25
+softconv_ratio: 0.5
+no_fix_flow: true
+network_g:
+  type: cpfp
+datasets:
+  val:
+    name: gopro
+    type: VideoRecurrentTestDatasetlocal
+    dataroot_gt: 
+    dataroot_lq: 
+    dataroot_mv: 
+    dataroot_resi: 
+
+    load_MVs: True
+    load_resi: True
+
+    cache_data: false
+    io_backend:
+      type: disk
+
+    num_frame: 48
+path:
+  pretrain_network_g:   
+  pretrain_network_f:   
+  strict_load_g: False
+# validation settings
+val:
+  val_freq: !!float 2500
+  save_img: false
+  crop_size: 256
+  max_minibatch: 1
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calculate_psnr
+      crop_border: 0
+      test_y_channel: false
+    ssim:
+      type: ssim_calculate
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29510
+find_unused_parameters: True
+
+
+model:
+  cldm:
+    target: CPC.cpc.model.cldm.ControlLDM
+    params:
+      latent_scale_factor: 0.18215
+      unet_cfg:
+        use_checkpoint: True
+        image_size: 32 # unused
+        in_channels: 4
+        out_channels: 4
+        model_channels: 320
+        attention_resolutions: [ 4, 2, 1 ]
+        num_res_blocks: 2
+        channel_mult: [ 1, 2, 4, 4 ]
+        num_head_channels: 64 # need to fix for flash-attn
+        use_spatial_transformer: True
+        use_linear_in_transformer: True
+        transformer_depth: 1
+        context_dim: 1024
+        legacy: False
+      vae_cfg:
+        embed_dim: 4
+        ddconfig:
+          double_z: true
+          z_channels: 4
+          resolution: 256
+          in_channels: 3
+          out_ch: 3
+          ch: 128
+          ch_mult:
+          - 1
+          - 2
+          - 4
+          - 4
+          num_res_blocks: 2
+          attn_resolutions: []
+          dropout: 0.0
+      clip_cfg:
+        embed_dim: 1024
+        vision_cfg:
+          image_size: 224
+          layers: 32
+          width: 1280
+          head_width: 80
+          patch_size: 14
+        text_cfg:
+          context_length: 77
+          vocab_size: 49408
+          width: 1024
+          heads: 16
+          layers: 24
+        layer: "penultimate"
+      controlnet_cfg:
+        use_checkpoint: True
+        image_size: 32 # unused
+        in_channels: 4
+        hint_channels: 4
+        model_channels: 320
+        attention_resolutions: [ 4, 2, 1 ]
+        num_res_blocks: 2
+        channel_mult: [ 1, 2, 4, 4 ]
+        num_head_channels: 64 # need to fix for flash-attn
+        use_spatial_transformer: True
+        use_linear_in_transformer: True
+        transformer_depth: 1
+        context_dim: 1024
+        legacy: False
+
+  diffusion:
+    target: CPC.cpc.model.gaussian_diffusion.Diffusion
+    params:
+      linear_start: 0.00085
+      linear_end: 0.0120
+      timesteps: 1000
+      zero_snr: False
+      parameterization: eps
+
+test:
+  # pretrained sd v2.1 
+  sd_path: model_zoo/v2-1_512-ema-pruned.ckpt
+  resume: 
+
+
